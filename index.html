@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>专利项目经验检索台</title>
+<style>
+:root{
+  --bg:#0f1419; --panel:#161d24; --panel2:#1c242d; --border:#2a3540;
+  --tx:#d8e1ea; --tx2:#8fa1b3; --acc:#4f9cf9; --acc2:#37b37e; --warn:#e8a33d;
+  --chip:#233040; --chip-tx:#9cc4ef;
+}
+*{box-sizing:border-box; margin:0; padding:0}
+body{background:var(--bg); color:var(--tx); font:14px/1.65 "Microsoft YaHei",system-ui,sans-serif; height:100vh; display:flex; flex-direction:column; overflow:hidden}
+header{display:flex; align-items:center; gap:14px; padding:10px 18px; background:var(--panel); border-bottom:1px solid var(--border); flex:0 0 auto}
+header h1{font-size:16px; font-weight:600}
+header .stat{color:var(--tx2); font-size:12px}
+.badge{font-size:11px; padding:2px 8px; border-radius:10px; border:1px solid var(--border)}
+.badge.on{color:#7ee2a8; border-color:#2c6e4b}
+.badge.off{color:var(--tx2)}
+.spacer{flex:1}
+#main{display:flex; flex:1; overflow:hidden}
+/* 左侧筛选 */
+#side{width:230px; flex:0 0 auto; background:var(--panel); border-right:1px solid var(--border); padding:14px; overflow-y:auto}
+#side h3{font-size:12px; color:var(--tx2); margin:14px 0 6px; font-weight:600}
+#side h3:first-child{margin-top:0}
+#side select,#side input{width:100%; background:var(--panel2); color:var(--tx); border:1px solid var(--border); border-radius:6px; padding:6px 8px; font-size:13px}
+#side button{margin-top:14px; width:100%}
+#side .btnrow{display:flex; gap:6px; margin-top:14px}
+#side .btnrow button{margin-top:0; flex:1; padding:8px 4px}
+/* 中部 */
+#center{flex:1; display:flex; flex-direction:column; overflow:hidden}
+#querybar{padding:14px 18px; background:var(--panel); border-bottom:1px solid var(--border)}
+#q{width:100%; background:var(--panel2); color:var(--tx); border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:14px; resize:vertical; min-height:64px; font-family:inherit}
+#querybar .row{display:flex; gap:10px; margin-top:10px; align-items:center}
+button{background:var(--acc); border:none; color:#fff; padding:8px 18px; border-radius:7px; cursor:pointer; font-size:13px}
+button.ghost{background:var(--panel2); color:var(--tx2); border:1px solid var(--border)}
+button:hover{filter:brightness(1.1)}
+#results{flex:1; overflow-y:auto; padding:16px 18px}
+.card{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:14px}
+.card h2{font-size:14px; color:var(--acc); margin-bottom:8px; font-weight:600}
+.answer{font-size:14px}
+.answer h2{color:var(--acc2); margin:12px 0 6px}
+.answer table{border-collapse:collapse; width:100%; margin:8px 0; font-size:13px}
+.answer th,.answer td{border:1px solid var(--border); padding:5px 9px; text-align:left}
+.answer th{background:var(--panel2)}
+.answer code{background:var(--panel2); padding:1px 6px; border-radius:4px; font-size:13px; color:#a8d3ff}
+.answer pre{background:var(--panel2); border:1px solid var(--border); border-radius:7px; padding:10px; overflow-x:auto; margin:6px 0}
+.answer pre code{background:none; padding:0}
+.answer li{margin-left:18px}
+.cite{display:inline-block; background:var(--chip); color:var(--chip-tx); border-radius:4px; padding:0 6px; font-size:11px; cursor:pointer; text-decoration:none; margin:0 1px; vertical-align:1px}
+.cite:hover{background:var(--acc); color:#fff}
+.pcard{display:flex; gap:14px; align-items:flex-start; padding:10px 12px; border:1px solid var(--border); border-radius:8px; margin-bottom:8px; background:var(--panel2)}
+.pcard .ttl{font-weight:600; color:var(--acc)}
+.pcard .meta{color:var(--tx2); font-size:12px}
+.pcard .docs{margin-top:4px}
+.mini{font-size:12px; color:var(--acc); text-decoration:none; margin-right:10px}
+.mini:hover{text-decoration:underline}
+.chip{display:inline-block; background:var(--chip); color:var(--chip-tx); border-radius:5px; padding:3px 10px; margin:3px 6px 3px 0; font-size:12px; cursor:pointer; border:1px solid transparent}
+.chip:hover{border-color:var(--acc)}
+.chip.ipc{color:#f0c674}
+.chip .n{color:var(--tx2); font-size:10px; margin-left:3px}
+.evi{padding:9px 10px; border-bottom:1px solid var(--border)}
+.evi:last-child{border-bottom:none}
+.evi .t{font-weight:600; font-size:13px}
+.evi .m{color:var(--tx2); font-size:11px; margin:2px 0}
+.evi .s{font-size:12px; color:var(--tx2); background:var(--panel2); border-radius:5px; padding:6px 9px; margin-top:4px}
+.evi .btns{margin-top:5px}
+.tag{display:inline-block; font-size:10px; padding:1px 7px; border-radius:9px; background:var(--panel2); color:var(--tx2); margin-left:6px; vertical-align:1px}
+.toast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--acc); color:#fff; padding:8px 20px; border-radius:8px; font-size:13px; opacity:0; transition:opacity .3s; z-index:9}
+.empty{color:var(--tx2); text-align:center; padding:60px 20px; font-size:13px; line-height:2}
+#foot{padding:5px 18px; font-size:11px; color:var(--tx2); border-top:1px solid var(--border); background:var(--panel); display:flex; gap:18px}
+.mode{display:flex; background:var(--panel2); border:1px solid var(--border); border-radius:7px; overflow:hidden}
+.mode span{padding:6px 14px; cursor:pointer; font-size:12px; color:var(--tx2)}
+.mode span.on{background:var(--acc); color:#fff}
+</style>
+</head>
+<body>
+<header>
+  <h1>🔍 专利项目经验检索台</h1>
+  <span class="stat" id="stats">加载中…</span>
+  <span class="badge off" id="llmbadge">LLM</span>
+  <div class="spacer"></div>
+  <div class="mode"><span class="on" data-mode="fast" onclick="setMode('fast')">快速</span><span data-mode="deep" onclick="setMode('deep')">深度</span></div>
+  <button class="ghost" onclick="rescan()">同步知识库</button>
+</header>
+<div id="main">
+  <div id="side">
+    <h3>客户</h3><select id="f_client"><option value="">全部</option></select>
+    <h3>技术域</h3><select id="f_tech"><option value="">全部</option></select>
+    <h3>项目类型</h3><select id="f_type"><option value="">全部</option></select>
+    <h3>年份</h3><select id="f_year"><option value="">全部</option></select>
+    <h3>项目号</h3><input id="f_project" placeholder="如 PROJ-1234">
+    <div class="btnrow">
+      <button onclick="applyFilter()" title="按上面的选择直接筛选文档；若已输入描述则重跑检索">筛选</button>
+      <button class="ghost" onclick="resetFilters()">清空筛选</button>
+    </div>
+  </div>
+  <div id="center">
+    <div id="querybar">
+      <textarea id="q" placeholder="描述新项目，例如：客户是做扫地机器人的，要做美国 FTO 检索，重点排查激光雷达避障和拖地模块…&#10;也可以直接输入技术词检索历史项目"></textarea>
+      <div class="row">
+        <button onclick="ask()">🧭 生成检索方案</button>
+        <button class="ghost" onclick="doSearch()">🔎 纯检索</button>
+        <span class="stat" id="busy"></span>
+      </div>
+    </div>
+    <div id="results"><div class="empty">在上方输入新项目描述，一键生成：<br>相似历史项目 · 推荐关键词 · 推荐分类号 · 检索式<br>所有结论都可点击引用直达历史文件</div></div>
+  </div>
+</div>
+<div id="foot"><span id="foot_llm"></span><span id="foot_cost"></span><span id="foot_time"></span></div>
+<div class="toast" id="toast"></div>
+<script>
+let MODE='fast', BUSY=false, LAST_ANSWER='';
+const $=s=>document.querySelector(s);
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function toast(t){const el=$('#toast');el.textContent=t;el.style.opacity=1;setTimeout(()=>el.style.opacity=0,1600)}
+function setMode(m){MODE=m;document.querySelectorAll('.mode span').forEach(s=>s.classList.toggle('on',s.dataset.mode===m))}
+function filters(){return{client:$('#f_client').value,tech:$('#f_tech').value,type:$('#f_type').value,year:$('#f_year').value,project:$('#f_project').value.trim()}}
+function resetFilters(){['f_client','f_tech','f_type','f_year'].forEach(i=>$('#'+i).value='');$('#f_project').value=''}
+
+/* 轻量 markdown 渲染 */
+function md(s){
+  const lines=esc(s).split('\n');let out='',inCode=false,inTable=false,inList=false;
+  for(let ln of lines){
+    if(ln.startsWith('```')){out+=inCode?'</code></pre>':'<pre><code>';inCode=!inCode;continue}
+    if(inCode){out+=ln+'\n';continue}
+    if(/^\s*\|/.test(ln)&&/\|/.test(ln.slice(1))){
+      const cells=ln.split('|').slice(1,-1).map(c=>c.trim());
+      if(/^[-: ]+$/.test(cells.join(''))){continue}
+      if(!inTable){out+='<table>';inTable=true;out+='<tr>'+cells.map(c=>'<th>'+c+'</th>').join('')+'</tr>'}
+      else{out+='<tr>'+cells.map(c=>'<td>'+c+'</td>').join('')+'</tr>'}
+      continue
+    }
+    if(inTable){out+='</table>';inTable=false}
+    const h=ln.match(/^(#{1,4})\s+(.*)/);
+    if(h){if(inList){out+='</ul>';inList=false}out+=`<h${Math.min(h[1].length+1,4)}>`+inline(h[2])+`</h${Math.min(h[1].length+1,4)}>`;continue}
+    if(/^\s*[-*]\s+/.test(ln)){if(!inList){out+='<ul>';inList=true}out+='<li>'+inline(ln.replace(/^\s*[-*]\s+/,''))+'</li>';continue}
+    if(inList){out+='</ul>';inList=false}
+    if(ln.trim()===''){continue}
+    out+='<p>'+inline(ln)+'</p>';
+  }
+  if(inTable)out+='</table>';if(inList)out+='</ul>';if(inCode)out+='</code></pre>';
+  return out;
+}
+function inline(s){
+  s=s.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>');
+  s=s.replace(/\[(\d{1,3})\]/g,(m,n)=>`<a class="cite" onclick="jump(${n})" title="点击查看历史文件">[${n}]</a>`);
+  return s;
+}
+function jump(n){const e=EVIS[n];if(!e)return;openEvidence(e)}
+function openEvidence(e){
+  if(e.obsidian){window.open(e.obsidian,'_blank')}
+  else{window.open(e.file_url,'_blank')}
+}
+
+async function api(path,body){
+  const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
+  return r.json();
+}
+let EVIS=[];
+async function loadHeader(){
+  const s=await api('/api/stats');
+  $('#stats').textContent=`${s.docs} 份文档 · ${s.texts} 份全文 · ${s.projects} 个项目`;
+  const b=$('#llmbadge');
+  if(s.llm){b.textContent='LLM: '+s.llm_model;b.className='badge on';$('#foot_llm').textContent='LLM 已接入 '+s.llm_model}
+  else{b.textContent='LLM 未配置（本地模式）';b.className='badge off';$('#foot_llm').textContent='未配置 DeepSeek Key，当前为本地检索模式'}
+  const f=await api('/api/filters');
+  const fill=(id,items)=>{const el=$('#'+id);items.forEach(it=>{const o=document.createElement('option');o.value=it.v;o.textContent=it.t;el.appendChild(o)})};
+  fill('f_client',f.clients.map(c=>({v:c.name,t:`${c.name} (${c.n})`})));
+  fill('f_tech',f.techs.map(v=>({v,t:v})));
+  fill('f_type',f.types.map(v=>({v,t:v})));
+  fill('f_year',f.years.map(v=>({v,t:v})));
+  if(s.sync_log&&s.sync_log.last_scan)$('#foot_time').textContent='最近同步: '+s.sync_log.last_scan;
+}
+function eviHtml(e){
+  return `<div class="evi"><div class="t">[${e.cite}] ${esc(e.title)}</div>
+  <div class="m">${esc(e.client||'')} ${esc(e.year||'')} ${e.project?'· '+esc(e.project):''} ${e.tech?'· '+esc(e.tech):''} ${e.type?'· '+esc(e.type):''}<span class="tag">${esc(e.ext)}</span></div>
+  <div class="s">${esc(e.snippet)}</div>
+  <div class="btns">
+    ${e.obsidian?`<a class="mini" href="${e.obsidian}" target="_blank">📓 在 Obsidian 打开</a>`:''}
+    <a class="mini" href="${e.file_url}" target="_blank">📄 打开原件</a>
+    <a class="mini" href="#" onclick="reveal(${e.id});return false">📁 定位文件夹</a>
+  </div></div>`;
+}
+function projHtml(p,i){
+  const docs=(p.docs||[]).map(d=>`<a class="mini" href="${d.obsidian||d.file_url}" target="_blank">📄 ${esc((d.title||'').slice(0,40))}</a>`).join('');
+  return `<div class="pcard"><div style="flex:1">
+    <span class="ttl">${esc(p.code)}</span><span class="tag">${p.doc_count} 份文档</span>
+    <div class="meta">客户: ${esc(p.clients||'-')} | ${esc(p.years||'')} | 技术域: ${esc(p.tech||'-')} | 类型: ${esc(p.types||'-')}</div>
+    <div class="meta">关键词: ${esc((p.keywords||[]).slice(0,10).join('、'))}</div>
+    ${(p.ipc&&p.ipc.length)?`<div class="meta">IPC: ${p.ipc.slice(0,6).map(x=>esc(x[0])).join('、')}</div>`:''}
+    <div class="docs">${docs}</div></div></div>`;
+}
+async function ask(){
+  if(BUSY) return;
+  const q=$('#q').value.trim();
+  if(!q){toast('请先输入新项目描述');return}
+  BUSY=true;
+  $('#busy').textContent='分析中（LLM 约 20–60 秒）…';
+  $('#results').innerHTML='<div class="empty">正在检索历史项目并生成方案…</div>';
+  try{
+    const r=await api('/api/ask',{q,filters:filters(),mode:MODE});
+    if(r.error){$('#results').innerHTML=`<div class="empty">服务出错：${esc(r.error)}</div>`;BUSY=false;$('#busy').textContent='';return}
+    EVIS=[];r.evidence.forEach(e=>EVIS[e.cite]=e);
+    LAST_ANSWER=r.answer||'';
+    const kwHtml=r.keywords.map(k=>`<span class="chip" data-kw="${esc(k.kw)}" onclick="copyText(this.dataset.kw)">${esc(k.kw)}<span class="n">${k.en?'EN':'CN'}</span></span>`).join('');
+    const ipcHtml=r.ipcs.map(i=>`<span class="chip ipc" data-kw="${esc(i.code)}" onclick="copyText(this.dataset.kw)">${esc(i.code)}<span class="n">实证×${i.n}</span></span>`).join('')||'<span class="meta">无</span>';
+    const qHtml=(r.queries||[]).map(qq=>`<div class="evi"><div class="s" style="font-size:12px">${esc(qq.slice(0,300))}</div><div class="btns"><a class="mini" href="#" onclick="copyText(this.parentElement.parentElement.querySelector('.s').textContent);return false">复制</a></div></div>`).join('');
+    $('#results').innerHTML=`
+      <div class="card"><h2>🧭 检索方案 <a class="mini" href="#" onclick="copyText(LAST_ANSWER);return false">复制全文</a></h2><div class="answer">${md(r.answer)}</div></div>
+      <div class="card"><h2>📁 相似历史项目</h2>${r.projects.map(projHtml).join('')||'<div class="meta">无</div>'}</div>
+      <div class="card"><h2>🔑 推荐关键词</h2><div>${kwHtml}</div><div class="meta" style="margin-top:6px;color:var(--tx2);font-size:11px">点击复制</div></div>
+      <div class="card"><h2>🏷️ 推荐分类号（IPC，历史实证）</h2><div>${ipcHtml}</div></div>
+      <div class="card"><h2>📜 历史检索式样例</h2>${qHtml||'<div class="meta">无</div>'}</div>
+      <div class="card"><h2>📚 证据文件</h2>${r.evidence.map(eviHtml).join('')||'<div class="meta">无</div>'}</div>`;
+    if(r.usage)$('#foot_cost').textContent=`本次消耗: ${r.usage.total_tokens} tokens ≈ ¥${(r.usage.prompt_tokens*1.5/1e6+r.usage.completion_tokens*4/1e6).toFixed(3)}`;
+    $('#foot_time').textContent='耗时 '+r.elapsed+'s';
+  }catch(e){$('#results').innerHTML=`<div class="empty">出错: ${esc(String(e))}</div>`}
+  BUSY=false;
+  $('#busy').textContent='';
+}
+async function doSearch(){
+  if(BUSY) return;
+  const q=$('#q').value.trim();
+  if(!q){toast('请输入检索词');return}
+  BUSY=true;
+  $('#busy').textContent='检索中…';
+  try{
+    const r=await api('/api/search',{q,filters:filters()});
+    if(r.error){$('#results').innerHTML=`<div class="empty">检索出错：${esc(r.error)}</div>`;return}
+    EVIS=[];r.hits.forEach((e,i)=>{e.cite=i+1;EVIS[i+1]=e});
+    $('#results').innerHTML=`
+      <div class="card"><h2>🔎 文档命中 ${r.hits.length} 条（分词: ${esc((r.terms||[]).join(' / '))}）</h2>
+      ${r.hits.map(eviHtml).join('')||'<div class="meta">无命中，试试更短的技术词</div>'}</div>
+      <div class="card"><h2>📁 相关项目</h2>${r.projects.map(projHtml).join('')||'<div class="meta">无</div>'}</div>`;
+  }catch(e){$('#results').innerHTML=`<div class="empty">出错: ${esc(String(e))}</div>`}
+  BUSY=false;
+  $('#busy').textContent='';
+}
+async function applyFilter(){
+  if(BUSY) return;
+  const q=$('#q').value.trim();
+  if(q){ await doSearch(); return; }   // 有描述时按筛选条件重跑检索
+  BUSY=true;
+  $('#busy').textContent='筛选中…';
+  try{
+    const r=await api('/api/browse', filters());
+    if(r.error) throw new Error(r.error);
+    EVIS=[];r.hits.forEach((e,i)=>{e.cite=i+1;EVIS[i+1]=e});
+    const f=filters();
+    const desc=Object.entries(f).filter(x=>x[1]).map(x=>x[0]+'='+x[1]).join(' · ')||'全部文档';
+    $('#results').innerHTML=`<div class="card"><h2>🔎 筛选结果 ${r.hits.length} 条 <span class="tag">${esc(desc)}</span></h2>
+      ${r.hits.map(eviHtml).join('')||'<div class="meta">无匹配文档，试试放宽条件</div>'}</div>`;
+  }catch(e){$('#results').innerHTML=`<div class="empty">筛选出错: ${esc(String(e))}</div>`}
+  BUSY=false;
+  $('#busy').textContent='';
+}
+async function reveal(id){await fetch('/api/reveal?id='+id);toast('已在资源管理器中定位')}
+function copyText(t){navigator.clipboard.writeText(t).then(()=>toast('已复制: '+t.slice(0,30))).catch(()=>toast(t))}
+async function rescan(){
+  $('#busy').textContent='同步中…';
+  try{const r=await api('/api/rescan',{});toast(`同步完成: +${r.added||0} 新增 / ~${r.updated||0} 更新 / -${r.deleted||0} 删除`);loadHeader()}
+  catch(e){toast('同步失败: '+e)}
+  $('#busy').textContent='';
+}
+loadHeader();
+</script>
+</body>
+</html>

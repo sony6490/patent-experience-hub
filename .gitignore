@@ -1,0 +1,11 @@
+data/
+config.json
+config.local.json
+__pycache__/
+*.pyc
+*.db
+*.db-wal
+*.db-shm
+.vscode/
+.idea/
+.DS_Store

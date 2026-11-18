@@ -1,0 +1,46 @@
+{
+  "root": "<VAULT_ROOT>",
+  "vault_name": "MyVault",
+  "scan_dirs": [
+    "项目资料",
+    "归档文件",
+    "供应商资料",
+    "公司资料"
+  ],
+  "exclude_dirs": [
+    "node_modules",
+    ".obsidian",
+    ".trash",
+    "报销文件",
+    "员工档案",
+    "__pycache__",
+    ".git",
+    "app"
+  ],
+  "exclude_file_prefixes": [
+    "~$"
+  ],
+  "text_exts": [
+    ".docx",
+    ".xlsx",
+    ".pptx",
+    ".pdf",
+    ".doc",
+    ".xls",
+    ".txt",
+    ".md",
+    ".csv",
+    ".html",
+    ".htm"
+  ],
+  "pdf_whitelist_keywords": "报告|report|FTO|无效|检索|分析|意见|综述|评估|预警|查新",
+  "max_file_mb": 60,
+  "text_cap_chars": 800000,
+  "db": "data/kb.db",
+  "text_cache": "data/text",
+  "tombstones": "data/tombstones",
+  "sync_interval_sec": 300,
+  "tombstone_days": 30,
+  "server_host": "127.0.0.1",
+  "server_port": 8766
+}

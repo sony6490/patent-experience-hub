@@ -1,0 +1,15 @@
+{
+  "llm": {
+    "enabled": false,
+    "base_url": "https://api.deepseek.com",
+    "api_key": "",
+    "model": "deepseek-chat",
+    "temperature": 0.2,
+    "max_tokens": 3500
+  },
+  "ask": {
+    "fast_max_docs": 10,
+    "deep_max_docs": 24,
+    "max_input_tokens_estimate": 30000
+  }
+}
