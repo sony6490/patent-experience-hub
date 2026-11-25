@@ -520,6 +520,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._serve_file(qs.get("id", [""])[0])
         if path == "/api/reveal":
             return self._reveal(qs.get("id", [""])[0])
+        if path == "/api/kb_folders":
+            return self._get_kb_folders()
         return self._json({"error": "not found"}, 404)
 
     def do_POST(self):
@@ -555,6 +557,8 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 return self._json({"error": str(e)[:300]}, 500)
             return self._json(res)
+        if self.path == "/api/kb_folders":
+            return self._set_kb_folders()
         if self.path == "/api/rescan":
             try:
                 import sync
@@ -563,6 +567,59 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 return self._json({"error": str(e)[:200]}, 500)
         return self._json({"error": "not found"}, 404)
+
+    def _get_kb_folders(self):
+        root = Path(K.CFG["root"])
+        scan = list(K.CFG.get("scan_dirs", []))
+        excl = set(K.CFG.get("exclude_dirs", []))
+        names = []
+        try:
+            names = [p.name for p in root.iterdir()
+                     if p.is_dir() and not p.name.startswith(".") and p.name not in excl]
+        except Exception:
+            pass
+        for s in scan:
+            top = s.split("/", 1)[0]
+            if top not in names and top not in excl:
+                names.append(top)
+        folders = []
+        with _db() as conn:
+            for name in sorted(set(names)):
+                n = conn.execute(
+                    "SELECT COUNT(*) FROM docs WHERE status=1 AND path LIKE ?",
+                    (name + "\\%",)).fetchone()[0]
+                folders.append({"path": name, "n": n})
+        return self._json({"root": str(root), "scan_dirs": scan,
+                           "exclude_dirs": sorted(excl), "folders": folders})
+
+    def _set_kb_folders(self):
+        body = self._read_body()
+        new_scan = body.get("scan_dirs")
+        force = bool(body.get("force"))
+        if not isinstance(new_scan, list) or not all(isinstance(x, str) for x in new_scan):
+            return self._json({"error": "scan_dirs 必须是字符串列表"}, 400)
+        clean = []
+        for s in new_scan:
+            s = s.strip().replace("\\", "/").strip("/")
+            if not s or s.startswith(".") or s.startswith("/") or ":" in s \
+                    or ".." in s.split("/"):
+                return self._json({"error": "非法文件夹路径: " + s}, 400)
+            if s not in clean:
+                clean.append(s)
+        cfg_path = K.APP / "config.json"
+        try:
+            cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+            cfg["scan_dirs"] = clean
+            tmp = cfg_path.with_name("config.json.tmp")
+            tmp.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            os.replace(tmp, cfg_path)
+            K.reload_config()
+            import sync
+            sync.reload_cfg()
+            state = sync.scan_once(force=force)
+        except Exception as e:
+            return self._json({"error": str(e)[:300]}, 500)
+        return self._json({"ok": True, "scan_dirs": clean, "sync": state})
 
     def _static(self, name):
         f = (STATIC / name).resolve()
@@ -644,11 +701,22 @@ def _last_sync():
     return {}
 
 
+def _write_pid(name="server.pid"):
+    """写下当前进程 PID，供「停止服务.bat」精确结束（不误杀其他 python）。"""
+    try:
+        p = K.APP / "data" / name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(str(os.getpid()), encoding="ascii")
+    except Exception:
+        pass
+
+
 def main():
     ThreadingHTTPServer.daemon_threads = True
     addr = (HOST, PORT)
     httpd = ThreadingHTTPServer(addr, Handler)
-    print(f"[server] PatentKB 检索窗口 http://{HOST}:{PORT}  (LLM: {'ON/' + LLM.get('model', '') if LLM_ENABLED else 'OFF(本地模式)'})",
+    _write_pid("server.pid")
+    print(f"[server] 专利项目经验检索台 by oc 检索窗口 http://{HOST}:{PORT}  (LLM: {'ON/' + LLM.get('model', '') if LLM_ENABLED else 'OFF(本地模式)'})",
           flush=True)
     httpd.serve_forever()
 

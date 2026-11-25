@@ -17,13 +17,15 @@ import hashlib
 from pathlib import Path
 
 APP = Path(__file__).resolve().parent
-PKB = APP.parent                      # .../patent-kb
-sys.path.insert(0, str(PKB))
+PKB = APP.parent                      # 内嵌在 Obsidian 库时，上一级就是库根（wiki 在那儿）
+# kb.py 可与本文件同级，也可在上级目录（Obsidian 库内嵌部署）
+for _p in (APP, APP.parent):
+    if (_p / "kb.py").exists():
+        sys.path.insert(0, str(_p))
+        break
 import kb                              # 零依赖抽取与派生函数
 
 APP_DIR_NAME = "app"
-TOP_DIRS = {"研发实体", "Sunyu", "律所&代理公司", "公司介绍及服务协议",
-            "政府及事业单位", "金融机构", "！格式化文件", "patent-kb"}
 
 # ---------------- 配置 ----------------
 def load_config():
@@ -36,6 +38,16 @@ def load_config():
             cfg["llm_cfg"] = {}
     else:
         cfg["llm_cfg"] = {}
+    # 环境变量兜底：不想把 Key 写进文件时，设 KB_LLM_API_KEY（或 DEEPSEEK_API_KEY）
+    env_key = (os.environ.get("KB_LLM_API_KEY")
+               or os.environ.get("DEEPSEEK_API_KEY") or "").strip()
+    if env_key:
+        llm_cfg = dict(cfg.get("llm_cfg") or {})
+        llm = dict(llm_cfg.get("llm") or {})
+        llm["api_key"] = env_key
+        llm["enabled"] = True
+        llm_cfg["llm"] = llm
+        cfg["llm_cfg"] = llm_cfg
     return cfg
 
 CFG = load_config()
@@ -44,6 +56,24 @@ DB_PATH = APP / CFG["db"]
 TEXT_CACHE = APP / CFG["text_cache"]
 TOMBSTONES = APP / CFG["tombstones"]
 TEXT_CAP = int(CFG.get("text_cap_chars", 800000))
+
+# 顶层目录名不当作客户/项目组；从 config.json 的 scan_dirs 推导
+TOP_DIRS = set(CFG.get("scan_dirs") or []) | {APP.name, "data"}
+
+
+def reload_config():
+    """热加载 config.json：就地更新 CFG（server/sync 持有同一对象引用），并刷新派生路径。"""
+    global ROOT, DB_PATH, TEXT_CACHE, TOMBSTONES, TEXT_CAP, TOP_DIRS
+    new = load_config()
+    CFG.clear()
+    CFG.update(new)
+    ROOT = Path(CFG["root"])
+    DB_PATH = APP / CFG["db"]
+    TEXT_CACHE = APP / CFG["text_cache"]
+    TOMBSTONES = APP / CFG["tombstones"]
+    TEXT_CAP = int(CFG.get("text_cap_chars", 800000))
+    TOP_DIRS = set(CFG.get("scan_dirs") or []) | {APP.name, "data"}
+    return CFG
 
 # ---------------- 停用词 ----------------
 STOPWORDS = set("""
@@ -325,18 +355,44 @@ def derive_client(rel, title):
     return ""
 
 
-def derive_meta(rel, title, text):
+def _project_code(hay):
+    """项目编号格式因团队而异：在 config.json 里设 code_pattern（含一个捕获组）即可替换默认规则。"""
+    pat = CFG.get("code_pattern")
+    if pat:
+        m = re.search(pat, hay, re.I)
+        return re.sub(r"\s+", "", m.group(0)).upper() if m else ""
+    return kb._derive_project_code(hay)
+
+
+def _tech_field(hay):
+    """技术域：config.json 里给了 tech_fields 就用它，否则退回内置词表。"""
+    fields = CFG.get("tech_fields")
+    if fields:
+        up = hay.upper()
+        for field, kws in fields.items():
+            for kw in kws:
+                if str(kw).upper() in up:
+                    return field
+        return ""
+    return kb._derive_tech_field(hay)
+
+
+def derive_meta(rel, title, text, mtime=None):
     rel_s = str(rel)
     client = derive_client(rel_s, title)
     # 技术域/项目类型/地域只用路径+文件名判定，避免正文词（如合同里的 scope）误判
     hay = rel_s + " " + (title or "")
-    code = kb._derive_project_code(hay)
+    code = _project_code(hay)
     if not code and text:
-        code = kb._derive_project_code(text[:3000])
-    year = kb._derive_year(title or rel_s, time.localtime().tm_year)
+        code = _project_code(text[:3000])
+    if mtime:
+        fallback = time.localtime(mtime).tm_year
+    else:
+        fallback = time.localtime().tm_year
+    year = kb._derive_year(title or rel_s, fallback)
     juris = kb._derive_jurisdiction(hay)
     ptype = kb._derive_project_type(hay)
-    tech = kb._derive_tech_field(hay)
+    tech = _tech_field(hay)
     ipcs = []
     if text:
         seen = set()

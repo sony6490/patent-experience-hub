@@ -122,7 +122,7 @@ def scan_once(force=False):
         path_str = str(K.ROOT / rel)
         r = B.process_file((path_str, rel, d["size"], d["mtime"], d["ext"]))
         if not r["text"]:
-            r["meta"] = K.derive_meta(rel, Path(rel).stem, "")
+            r["meta"] = K.derive_meta(rel, Path(rel).stem, "", d.get("mtime"))
             r["text_hash"] = ""
             r["tokens"] = ""
         else:
@@ -162,15 +162,32 @@ def scan_once(force=False):
     return state
 
 
+def reload_cfg():
+    """热加载配置（网页改完文件夹后，常驻同步进程下一轮自动生效）。"""
+    global INTERVAL, TOMBSTONE_DAYS
+    K.reload_config()
+    INTERVAL = int(K.CFG.get("sync_interval_sec", 300))
+    TOMBSTONE_DAYS = int(K.CFG.get("tombstone_days", 30))
+
+
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "once"
+    force = "--force" in sys.argv
     if mode == "once":
-        scan_once()
+        scan_once(force=force)
     elif mode == "loop":
+        # 写下 PID，供「停止服务.bat」精确结束常驻同步进程
+        try:
+            spath = K.APP / "data" / "sync.pid"
+            spath.parent.mkdir(parents=True, exist_ok=True)
+            spath.write_text(str(os.getpid()), encoding="ascii")
+        except Exception:
+            pass
         print(f"[sync] 常驻模式：每 {INTERVAL}s 增量扫描一次", flush=True)
         while True:
             try:
-                scan_once()
+                reload_cfg()
+                scan_once(force=force)
             except Exception as e:
                 print("[sync] error:", str(e)[:200], flush=True)
             time.sleep(INTERVAL)

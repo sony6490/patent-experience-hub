@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>专利项目经验检索台</title>
+<title>专利项目经验检索台 by oc</title>
 <style>
 :root{
   --bg:#0f1419; --panel:#161d24; --panel2:#1c242d; --border:#2a3540;
@@ -73,15 +73,30 @@ button:hover{filter:brightness(1.1)}
 .mode{display:flex; background:var(--panel2); border:1px solid var(--border); border-radius:7px; overflow:hidden}
 .mode span{padding:6px 14px; cursor:pointer; font-size:12px; color:var(--tx2)}
 .mode span.on{background:var(--acc); color:#fff}
+/* 知识库设置弹窗 */
+#kbmask{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:20;display:none;align-items:center;justify-content:center}
+#kbmodal{width:min(580px,92vw);max-height:82vh;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px 22px}
+#kbmodal h2{font-size:16px;color:var(--acc);margin-bottom:6px}
+#kbmodal .hint{color:var(--tx2);font-size:12px;margin-bottom:14px;line-height:1.7}
+#kblist label{display:flex;align-items:center;gap:9px;padding:7px 9px;border:1px solid var(--border);border-radius:7px;margin-bottom:6px;background:var(--panel2);cursor:pointer}
+#kblist label:hover{border-color:var(--acc)}
+#kblist input[type=checkbox]{width:15px;height:15px}
+#kblist .nm{flex:1}
+#kblist .cnt{color:var(--tx2);font-size:11px}
+#kbadd{display:flex;gap:8px;margin-top:12px}
+#kbadd input{flex:1;background:var(--panel2);color:var(--tx);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-size:13px}
+#kbfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;align-items:center}
+#kbmsg{margin-top:12px;font-size:12px;color:var(--warn);min-height:18px}
 </style>
 </head>
 <body>
 <header>
-  <h1>🔍 专利项目经验检索台</h1>
+  <h1>🔍 专利项目经验检索台 by oc</h1>
   <span class="stat" id="stats">加载中…</span>
   <span class="badge off" id="llmbadge">LLM</span>
   <div class="spacer"></div>
   <div class="mode"><span class="on" data-mode="fast" onclick="setMode('fast')">快速</span><span data-mode="deep" onclick="setMode('deep')">深度</span></div>
+  <button class="ghost" onclick="openKb()">⚙️ 知识库设置</button>
   <button class="ghost" onclick="rescan()">同步知识库</button>
 </header>
 <div id="main">
@@ -155,8 +170,16 @@ function openEvidence(e){
 }
 
 async function api(path,body){
-  const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
-  return r.json();
+  const opt=body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{};
+  try{const r=await fetch(path,opt);return await r.json()}
+  catch(e){
+    // 服务重启瞬间会短暂断连：GET 自动重试一次，POST 给出明确提示
+    if(!body){
+      await new Promise(r=>setTimeout(r,1000));
+      try{const r2=await fetch(path,opt);return await r2.json()}catch(_){}
+    }
+    throw new Error('无法连接到本地服务，请确认检索台已启动（双击「专利检索台-一键启动.bat」）后刷新页面重试');
+  }
 }
 let EVIS=[];
 async function loadHeader(){
@@ -264,7 +287,74 @@ async function rescan(){
   catch(e){toast('同步失败: '+e)}
   $('#busy').textContent='';
 }
+let KBCFG=null;
+async function openKb(){
+  if(BUSY){toast('请等待当前操作完成');return}
+  $('#kbmsg').textContent='';
+  $('#kbforce').style.display='none';
+  try{
+    KBCFG=await api('/api/kb_folders');
+    if(KBCFG.error) throw new Error(KBCFG.error);
+    $('#kbroot').textContent='根目录：'+KBCFG.root;
+    $('#kblist').innerHTML=(KBCFG.folders||[]).map(f=>`<label><input type="checkbox" value="${esc(f.path)}" ${KBCFG.scan_dirs.indexOf(f.path)>=0?'checked':''}><span class="nm">📁 ${esc(f.path)}</span><span class="cnt">${f.n} 份</span></label>`).join('')||'<div class="empty">根目录下未找到可选文件夹</div>';
+    $('#kbmask').style.display='flex';
+  }catch(e){toast('读取配置失败: '+e)}
+}
+function closeKb(){$('#kbmask').style.display='none'}
+function addKbFolder(){
+  const v=$('#kbnew').value.trim().replace(/\\/g,'/').replace(/^\/+|\/+$/g,'');
+  if(!v)return;
+  let cb=[...$('#kblist').querySelectorAll('input[type=checkbox]')].find(x=>x.value===v);
+  if(!cb){
+    $('#kblist').insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${esc(v)}" checked><span class="nm">📁 ${esc(v)}</span><span class="cnt">新增</span></label>`);
+    cb=[...$('#kblist').querySelectorAll('input[type=checkbox]')].find(x=>x.value===v);
+  }
+  if(cb)cb.checked=true;
+  $('#kbnew').value='';
+}
+async function saveKb(force){
+  const dirs=[...$('#kblist').querySelectorAll('input[type=checkbox]:checked')].map(x=>x.value);
+  if(!dirs.length){$('#kbmsg').textContent='请至少勾选一个文件夹';return}
+  if(!force && !confirm('按当前勾选更新知识库文件夹并立即同步？原文件不会被删除。'))return;
+  $('#kbmsg').textContent='正在保存并同步，请稍候（约几十秒）…';
+  try{
+    const r=await api('/api/kb_folders',{scan_dirs:dirs,force:!!force});
+    if(r.error) throw new Error(r.error);
+    const s=r.sync||{};
+    if(s.guarded){
+      $('#kbmsg').textContent='检测到大量删除，已跳过以防误删。确认要继续请点「强制同步」。';
+      $('#kbforce').style.display='inline-block';
+      return;
+    }
+    closeKb();
+    toast(`已更新：+${s.added||0} 新增 / ~${s.updated||0} 更新 / -${s.deleted||0} 移除`);
+    loadHeader();
+  }catch(e){$('#kbmsg').textContent='失败: '+e}
+}
 loadHeader();
+// URL 预填：?q=关键词&mode=fast|deep&run=1（直接出方案）&search=1（只纯检索）&kb=1（打开知识库设置）
+(function(){
+  const p=new URLSearchParams(location.search);
+  const q=p.get('q'); if(q) $('#q').value=q;
+  const m=p.get('mode'); if(m==='fast'||m==='deep') setMode(m);
+  if(p.get('kb')==='1') setTimeout(openKb,300);
+  else if(p.get('run')==='1') setTimeout(()=>{ p.get('search')==='1'?doSearch():ask(); },400);
+})();
 </script>
+<div id="kbmask" onclick="if(event.target===this)closeKb()">
+  <div id="kbmodal">
+    <h2>⚙️ 知识库设置</h2>
+    <div class="hint" id="kbroot">根目录：</div>
+    <div class="hint">勾选要检索的文件夹，取消勾选后其中的文档会从搜索结果中移除（<b>原始文件不会删除</b>）。保存后自动同步，通常几十秒。</div>
+    <div id="kblist"></div>
+    <div id="kbadd"><input id="kbnew" placeholder="也可输入子文件夹，如 2024/检索报告" onkeydown="if(event.key==='Enter')addKbFolder()"><button class="ghost" onclick="addKbFolder()">添加</button></div>
+    <div id="kbmsg"></div>
+    <div id="kbfoot">
+      <button class="ghost" id="kbforce" style="display:none" onclick="saveKb(true)">强制同步</button>
+      <button class="ghost" onclick="closeKb()">取消</button>
+      <button onclick="saveKb(false)">保存并同步</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

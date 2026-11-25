@@ -360,8 +360,9 @@ def _derive_year(name, mtime_year):
 
 
 def _derive_project_code(path_str):
-    m = re.search(r"[Ll][Zz]\s*(\d+)", path_str)
-    return ("LZ" + m.group(1)) if m else ""
+    # 项目编号规则因所而异，优先用 config.json 的 code_pattern，这里是通用兜底
+    m = re.search(r"\b([A-Z]{2,4}[- ]?\d{3,5})\b", path_str)
+    return m.group(1) if m else ""
 
 
 def _derive_jurisdiction(s):
@@ -398,11 +399,10 @@ def _derive_project_type(s):
 
 def _derive_tech_field(s):
     s_up = s.upper()
-    for field, kws in (("红外热成像", ("红外", "热成像", "THERMAL", "INFRARED")),
-                       ("毫米波雷达", ("雷达", "RADAR", "MMWAVE", "毫米波")),
-                       ("瞄准镜", ("瞄准镜", "测距", "SCOPE")),
-                       ("血糖监测", ("血糖", "BGM", "POCT", "CGM")),
-                       ("散热结构", ("散热", "导热", "手机壳")),
+    for field, kws in (("机器人本体", ("机器人", "机械臂", "AGV", "ROBOT")),
+                       ("动力电池", ("电池", "电芯", "模组", "BATTERY")),
+                       ("半导体封装", ("封装", "晶圆", "WAFER", "PACKAGING")),
+                       ("医疗器械", ("导管", "支架", "超声", "MEDICAL")),
                        ("外观设计", ("外观", "DESIGN"))):
         for kw in kws:
             if kw.upper() in s_up:

@@ -44,7 +44,7 @@ def process_file(args):
     if not text.strip():
         return out
     text = K.cap_text(K.clean_text(text))
-    meta = K.derive_meta(rel_str, path.stem, text)
+    meta = K.derive_meta(rel_str, path.stem, text, path.stat().st_mtime)
     out["text"] = text
     out["chars"] = len(text)
     out["meta"] = meta

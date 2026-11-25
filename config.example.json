@@ -11,11 +11,11 @@
     "node_modules",
     ".obsidian",
     ".trash",
-    "报销文件",
-    "员工档案",
+    "财务资料",
+    "个人档案",
     "__pycache__",
     ".git",
-    "app"
+    "data"
   ],
   "exclude_file_prefixes": [
     "~$"
@@ -36,6 +36,38 @@
   "pdf_whitelist_keywords": "报告|report|FTO|无效|检索|分析|意见|综述|评估|预警|查新",
   "max_file_mb": 60,
   "text_cap_chars": 800000,
+  "code_pattern": "",
+  "tech_fields": {
+    "机器人本体": [
+      "机器人",
+      "机械臂",
+      "AGV",
+      "ROBOT"
+    ],
+    "动力电池": [
+      "电池",
+      "电芯",
+      "模组",
+      "PACK",
+      "BATTERY"
+    ],
+    "半导体封装": [
+      "封装",
+      "晶圆",
+      "WAFER",
+      "PACKAGING"
+    ],
+    "医疗器械": [
+      "导管",
+      "支架",
+      "超声",
+      "MEDICAL"
+    ],
+    "外观设计": [
+      "外观",
+      "DESIGN"
+    ]
+  },
   "db": "data/kb.db",
   "text_cache": "data/text",
   "tombstones": "data/tombstones",
